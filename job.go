@@ -15,6 +15,7 @@ func (job LogJob) Execute() error {
 	return nil
 }
 
-type NoopJob struct{}
+type NoopJob struct {
+}
 
 func (job NoopJob) Execute() error { return nil }
