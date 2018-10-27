@@ -7,9 +7,9 @@ import (
 
 func main() {
 	s := NewScheduler()
-	t1 := OneTime{time.Now().Add(5 * time.Second)}
-	t2 := OneTime{time.Now().Add(10 * time.Second)}
-	t3 := NewRecurring(1 * time.Second)
+	t1 := OneTimeTrigger{time.Now().Add(5 * time.Second)}
+	t2 := OneTimeTrigger{time.Now().Add(10 * time.Second)}
+	t3 := NewRecurringTrigger(1 * time.Second)
 	j1 := LogJob{"job1 executing"}
 	j2 := LogJob{"job2 executing"}
 	j3 := LogJob{"job3 executing"}

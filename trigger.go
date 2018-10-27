@@ -8,18 +8,18 @@ type Trigger interface {
 	NextFire() time.Time
 }
 
-type Never struct {
+type NeverTrigger struct {
 }
 
-func (trigger Never) NextFire() time.Time {
+func (trigger NeverTrigger) NextFire() time.Time {
 	return past
 }
 
-type OneTime struct {
+type OneTimeTrigger struct {
 	t time.Time
 }
 
-func (trigger OneTime) NextFire() time.Time {
+func (trigger OneTimeTrigger) NextFire() time.Time {
 	now := time.Now()
 	if trigger.t.After(now) {
 		return trigger.t
@@ -27,21 +27,21 @@ func (trigger OneTime) NextFire() time.Time {
 	return past
 }
 
-type Recurring struct {
+type RecurringTrigger struct {
 	d       time.Duration
 	created time.Time
 	stopped bool
 }
 
-func NewRecurring(d time.Duration) *Recurring {
-	return &Recurring{
+func NewRecurringTrigger(d time.Duration) *RecurringTrigger {
+	return &RecurringTrigger{
 		d:       d,
 		created: time.Now(),
 		stopped: false,
 	}
 }
 
-func (trigger Recurring) NextFire() time.Time {
+func (trigger RecurringTrigger) NextFire() time.Time {
 	if trigger.stopped {
 		return past
 	}
@@ -52,6 +52,6 @@ func (trigger Recurring) NextFire() time.Time {
 	return now.Add(add)
 }
 
-func (trigger *Recurring) Stop() {
+func (trigger *RecurringTrigger) Stop() {
 	trigger.stopped = true
 }
