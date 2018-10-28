@@ -1,9 +1,15 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"sync"
 	"time"
+)
+
+var (
+	// ErrAlreadyRunning indicates that the scheduler is already running
+	ErrAlreadyRunning = errors.New("scheduler is already running")
 )
 
 type tjPair struct {
@@ -13,9 +19,8 @@ type tjPair struct {
 
 // Scheduler is the core object that coordinates executing jobs
 type Scheduler struct {
-	pairs   []tjPair
-	wg      sync.WaitGroup
-	running bool
+	pairs []tjPair
+	wg    sync.WaitGroup
 }
 
 // NewScheduler creates a new scheduler
@@ -29,13 +34,9 @@ func NewScheduler() *Scheduler {
 func (sch *Scheduler) Schedule(trigger Trigger, job Job) {
 	p := tjPair{trigger, job}
 	sch.pairs = append(sch.pairs, p)
-	sch.startTriggeredJob(p)
 }
 
 func (sch *Scheduler) startTriggeredJob(p tjPair) {
-	if !sch.running {
-		return
-	}
 	sch.wg.Add(1)
 	go func() {
 		defer sch.wg.Done()
@@ -58,7 +59,6 @@ func (sch *Scheduler) startTriggeredJob(p tjPair) {
 // Start starts the scheduler and executing jobs according to their triggers
 // Start is blocking function.
 func (sch *Scheduler) Start() error {
-	sch.running = true
 	for _, p := range sch.pairs {
 		sch.startTriggeredJob(p)
 	}
