@@ -6,50 +6,62 @@ import (
 	"time"
 )
 
-type scheduledPair struct {
-	t  Trigger
-	j  Job
-	id int
+type tjPair struct {
+	t Trigger
+	j Job
 }
 
+// Scheduler is the core object that coordinates executing jobs
 type Scheduler struct {
-	pairs []scheduledPair
-	size  int
-	wg    sync.WaitGroup
+	pairs   []tjPair
+	wg      sync.WaitGroup
+	running bool
 }
 
+// NewScheduler creates a new scheduler
 func NewScheduler() *Scheduler {
 	return &Scheduler{
-		pairs: make([]scheduledPair, 0),
-		size:  0,
+		pairs: make([]tjPair, 0),
 	}
 }
 
-func (scheduler *Scheduler) Schedule(trigger Trigger, job Job) {
-	scheduler.pairs = append(scheduler.pairs, scheduledPair{trigger, job, scheduler.size})
-	scheduler.size++
+// Schedule adds a job to the list of jobs to be executed.
+func (sch *Scheduler) Schedule(trigger Trigger, job Job) {
+	p := tjPair{trigger, job}
+	sch.pairs = append(sch.pairs, p)
+	sch.startTriggeredJob(p)
 }
 
-func (scheduler *Scheduler) startTriggeredJob(p scheduledPair) {
-	defer scheduler.wg.Done()
-	for {
-		ft := p.t.NextFire()
-		if !ft.After(time.Now()) {
-			return
+func (sch *Scheduler) startTriggeredJob(p tjPair) {
+	if !sch.running {
+		return
+	}
+	sch.wg.Add(1)
+	go func() {
+		defer sch.wg.Done()
+		for {
+			ft := p.t.NextFire()
+			if !ft.After(time.Now()) {
+				return
+			}
+			d := time.Until(ft)
+			time.Sleep(d)
+			go func() {
+				if err := p.j.Execute(); err != nil {
+					log.Println(err)
+				}
+			}()
 		}
-		d := time.Until(ft)
-		time.Sleep(d)
-		if err := p.j.Execute(); err != nil {
-			log.Println(err)
-		}
-	}
+	}()
 }
 
-func (scheduler *Scheduler) Start() error {
-	for _, p := range scheduler.pairs {
-		scheduler.wg.Add(1)
-		go scheduler.startTriggeredJob(p)
+// Start starts the scheduler and executing jobs according to their triggers
+// Start is blocking function.
+func (sch *Scheduler) Start() error {
+	sch.running = true
+	for _, p := range sch.pairs {
+		sch.startTriggeredJob(p)
 	}
-	scheduler.wg.Wait()
+	sch.wg.Wait()
 	return nil
 }
