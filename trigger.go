@@ -20,11 +20,7 @@ type OneTimeTrigger struct {
 }
 
 func (trigger OneTimeTrigger) NextFire() time.Time {
-	now := time.Now()
-	if trigger.t.After(now) {
-		return trigger.t
-	}
-	return past
+	return trigger.t
 }
 
 type RecurringTrigger struct {
