@@ -10,6 +10,9 @@ import (
 var (
 	// ErrAlreadyRunning indicates that the scheduler is already running
 	ErrAlreadyRunning = errors.New("scheduler is already running")
+
+	// ErrNotRunning indicates that the scheduler is not running
+	ErrNotRunning = errors.New("scheduler is not running")
 )
 
 type tjPair struct {
@@ -19,18 +22,22 @@ type tjPair struct {
 
 // Scheduler is the core object that coordinates executing jobs
 type Scheduler struct {
-	pairs []tjPair
-	wg    sync.WaitGroup
+	pairs   []tjPair
+	wg      sync.WaitGroup
+	done    chan (struct{})
+	running bool
 }
 
 // NewScheduler creates a new scheduler
 func NewScheduler() *Scheduler {
 	return &Scheduler{
 		pairs: make([]tjPair, 0),
+		done:  make(chan struct{}),
 	}
 }
 
 // Schedule adds a job to the list of jobs to be executed.
+// NOTE: Schedule would not schedule a job if the scheduler is already running
 func (sch *Scheduler) Schedule(trigger Trigger, job Job) {
 	p := tjPair{trigger, job}
 	sch.pairs = append(sch.pairs, p)
@@ -46,12 +53,17 @@ func (sch *Scheduler) startTriggeredJob(p tjPair) {
 				return
 			}
 			d := time.Until(ft)
-			time.Sleep(d)
-			go func() {
-				if err := p.j.Execute(); err != nil {
-					log.Println(err)
-				}
-			}()
+			select {
+			case <-sch.done:
+				return
+			case <-time.After(d):
+				go func() {
+					if err := p.j.Execute(); err != nil {
+						log.Println(err)
+					}
+				}()
+			}
+
 		}
 	}()
 }
@@ -59,9 +71,24 @@ func (sch *Scheduler) startTriggeredJob(p tjPair) {
 // Start starts the scheduler and executing jobs according to their triggers
 // Start is blocking function.
 func (sch *Scheduler) Start() error {
+	if sch.running {
+		return ErrAlreadyRunning
+	}
+	sch.running = true
 	for _, p := range sch.pairs {
 		sch.startTriggeredJob(p)
 	}
 	sch.wg.Wait()
+	return nil
+}
+
+// Stop stops the scheduler
+func (sch *Scheduler) Stop() error {
+	if !sch.running {
+		return ErrNotRunning
+	}
+	for range sch.pairs {
+		sch.done <- struct{}{}
+	}
 	return nil
 }
