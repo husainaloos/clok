@@ -22,9 +22,11 @@ type tjPair struct {
 
 // Scheduler is the core object that coordinates executing jobs
 type Scheduler struct {
-	pairs   []tjPair
-	wg      sync.WaitGroup
-	done    chan (struct{})
+	pairs []tjPair
+	wg    sync.WaitGroup
+	done  chan (struct{})
+
+	mu      sync.Mutex
 	running bool
 }
 
@@ -71,10 +73,13 @@ func (sch *Scheduler) startTriggeredJob(p tjPair) {
 // Start starts the scheduler and executing jobs according to their triggers
 // Start is blocking function.
 func (sch *Scheduler) Start() error {
+	sch.mu.Lock()
 	if sch.running {
+		sch.mu.Unlock()
 		return ErrAlreadyRunning
 	}
 	sch.running = true
+	sch.mu.Unlock()
 	for _, p := range sch.pairs {
 		sch.startTriggeredJob(p)
 	}
@@ -83,12 +88,14 @@ func (sch *Scheduler) Start() error {
 }
 
 // Stop stops the scheduler
-func (sch *Scheduler) Stop() error {
+func (sch *Scheduler) Stop() {
+	sch.mu.Lock()
+	defer sch.mu.Unlock()
 	if !sch.running {
-		return ErrNotRunning
+		return
 	}
 	for range sch.pairs {
 		sch.done <- struct{}{}
 	}
-	return nil
+	return
 }
